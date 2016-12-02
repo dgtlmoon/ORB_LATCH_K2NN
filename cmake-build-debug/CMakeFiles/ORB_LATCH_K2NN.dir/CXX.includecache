@@ -1,0 +1,32 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/tmp/ORB_LATCH_K2NN/LATCH.h
+future
+-
+immintrin.h
+-
+thread
+-
+vector
+-
+
+/tmp/ORB_LATCH_K2NN/main.cpp
+iostream
+-
+fstream
+-
+opencv2/opencv.hpp
+-
+LATCH.h
+/tmp/ORB_LATCH_K2NN/LATCH.h
+boost/filesystem.hpp
+-
+boost/range/iterator_range.hpp
+-
+

@@ -1,0 +1,4 @@
+/home/dgtlmoon/clion-2016.2.3/bin/cmake/bin/cmake -DCMAKE_BUILD_TYPE=Debug -G "CodeBlocks - Unix Makefiles" /tmp/ORB_LATCH_K2NN
+-- Configuring done
+-- Generating done
+-- Build files have been written to: /tmp/ORB_LATCH_K2NN/cmake-build-debug
