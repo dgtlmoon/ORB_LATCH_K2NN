@@ -6,6 +6,18 @@
 
 #IncludeRegexTransform: 
 
+/tmp/ORB_LATCH_K2NN/K2NN.h
+twiddle_table.h
+/tmp/ORB_LATCH_K2NN/twiddle_table.h
+future
+-
+nmmintrin.h
+-
+vector
+-
+iostream
+-
+
 /tmp/ORB_LATCH_K2NN/LATCH.h
 future
 -
@@ -23,10 +35,24 @@ fstream
 -
 opencv2/opencv.hpp
 -
+chrono
+-
+bitset
+-
 LATCH.h
 /tmp/ORB_LATCH_K2NN/LATCH.h
+K2NN.h
+/tmp/ORB_LATCH_K2NN/K2NN.h
 boost/filesystem.hpp
 -
 boost/range/iterator_range.hpp
+-
+boost/program_options.hpp
+-
+
+/tmp/ORB_LATCH_K2NN/twiddle_table.h
+cstdint
+-
+vector
 -
 

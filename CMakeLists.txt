@@ -8,4 +8,4 @@ set(OPENCV_LINKER_LIBS ${OPENCV_LINKER_LIBS} m pthread)
 set(SOURCE_FILES main.cpp)
 add_executable(ORB_LATCH_K2NN ${SOURCE_FILES})
 
-TARGET_LINK_LIBRARIES(ORB_LATCH_K2NN pthread opencv_core  opencv_highgui opencv_imgcodecs boost_system boost_filesystem opencv_features2d)
+TARGET_LINK_LIBRARIES(ORB_LATCH_K2NN pthread opencv_core  opencv_highgui opencv_imgcodecs boost_system boost_filesystem opencv_features2d boost_program_options)
