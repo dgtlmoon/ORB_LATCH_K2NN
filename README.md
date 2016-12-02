@@ -26,7 +26,11 @@ Options:
                         what is present in query.dat
 ```
 
+## Goal
   
+To be able to find images sorted by their _"similarity"_ in terms of ORB feature similarity to detect tshirts with 
+similar designs on them but taken by different photographers at different distances.
+
 ### Todo
 
 - Use CUDA libraries once basics are working
