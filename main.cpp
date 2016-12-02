@@ -37,7 +37,7 @@ void index(const char *path) {
 
     // ------------- Configuration ------------
     // detector
-    constexpr int numkps = 5000;
+    constexpr int numkps = 1000;
     constexpr bool multithread = true;
     // --------------------------------
 
