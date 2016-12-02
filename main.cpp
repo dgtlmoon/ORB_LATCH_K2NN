@@ -104,12 +104,12 @@ void index(const char *path) {
     }
 }
 
-void search() {
+void search(std::string search_type) {
     constexpr int warmups = 10;
     constexpr int runs = 25;
     constexpr int size = 10000;
-    constexpr int threshold = 1;
-    constexpr int max_twiddles = 2;
+    constexpr int threshold = 20;
+    constexpr int max_twiddles = 20;
     // --------------------------------
 
 
@@ -144,17 +144,26 @@ void search() {
     Matcher<false> m(tvecs.data(), size, qvecs.data(), size, threshold, max_twiddles);
 
     // @todo run in different thread so its already 'warmed up'
-
     std::cout << std::endl << "Warming up..." << std::endl;
-    for (int i = 0; i < warmups; ++i) m.fastApproxMatch();
-    std::cout << "Testing..." << std::endl;
-    high_resolution_clock::time_point start = high_resolution_clock::now();
-    m.fastApproxMatch();
+    high_resolution_clock::time_point start;
+
+    if(!search_type.compare("fast-approx")) {
+        for (int i = 0; i < warmups; ++i) m.fastApproxMatch();
+        std::cout << "Testing fast approximate matches..." << std::endl;
+        start = high_resolution_clock::now();
+        m.fastApproxMatch();
+    } else {
+        for (int i = 0; i < warmups; ++i) m.bruteMatch();
+        std::cout << "Testing brute-force..." << std::endl;
+        start = high_resolution_clock::now();
+        m.bruteMatch();
+    }
+
     high_resolution_clock::time_point end = high_resolution_clock::now();
 
     const double sec =
             static_cast<double>(duration_cast<nanoseconds>(end - start).count()) * 1e-9 / static_cast<double>(runs);
-    std::cout << std::endl << "fastApproxMatch K2NN found " << m.matches.size() << " matches in " << sec * 1e3 << " ms"
+    std::cout << std::endl << search_type << " K2NN found " << m.matches.size() << " matches in " << sec * 1e3 << " ms"
               << std::endl;
     std::cout << "Throughput: " << static_cast<double>(size) * static_cast<double>(size) / sec * 1e-9
               << " billion comparisons/second." << std::endl << std::endl;
@@ -169,6 +178,7 @@ void search() {
 
 int main(int argc, char **argv) {
     std::string index_path;
+    std::string search_type;
 
     try {
         /** Define and parse the program options
@@ -178,7 +188,7 @@ int main(int argc, char **argv) {
         desc.add_options()
                 ("help", "Print help messages")
                 ("index-path",  po::value<std::string>(&index_path), "/path/to; Create an index/training.dat file from images and a simple file with a single image query.dat set")
-                ("search", "Search training.dat for what is present in query.dat");
+                ("search",  po::value<std::string>(&search_type), "fast-approx or brute-force; Search training.dat for what is present in query.dat");
 
         po::variables_map vm;
         try {
@@ -203,7 +213,7 @@ int main(int argc, char **argv) {
 
 
             if (vm.count("search")) {
-                search();
+                search(vm["search"].as<std::string>());
                 return 1;
             }
 
