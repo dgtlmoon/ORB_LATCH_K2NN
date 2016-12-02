@@ -2,7 +2,7 @@
 
 ## About 
 
-Implementation of komrad36's LATCH and K2NN libraries from komrad36, based on ORB descriptors from OpenCV's features2d
+Implementation of komrad36's LATCH and K2NN libraries from komrad36, based on ORB keypoints from OpenCV's features2d
 
 - https://github.com/komrad36/LATCH
 - https://github.com/komrad36/K2NN
