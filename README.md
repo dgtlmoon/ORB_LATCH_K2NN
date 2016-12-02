@@ -9,11 +9,11 @@ Implementation of komrad36's LATCH and K2NN libraries from komrad36, based on OR
 
 ## Usage
 
-Builds a `training.dat` of all descriptors found in images located at `--index-path` (and a random image is chosen and added to `query.dat`)
+`--index-path <path>` Builds a `training.dat` of all descriptors found in images located at `<path>` (and a random image is chosen and added to `query.dat`)
 
 OR
 
-Search all of `training.dat` for the nearest neighbours (K2NN) from descriptors in `query.dat`
+`--search <type>` Search all of `training.dat` for the nearest neighbours (K2NN) from descriptors in `query.dat`, where type in `brute-force` or `fast-approx`
 
 
 ```
