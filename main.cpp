@@ -13,7 +13,11 @@
 
 using namespace std::chrono;
 
-
+// ------------- Configuration ------------
+// detector
+constexpr int numkps = 1000;
+constexpr bool multithread = true;
+// --------------------------------
 using namespace std;
 namespace po = boost::program_options;
 
@@ -35,11 +39,7 @@ void index(const char *path) {
 
     boost::filesystem::path p(path);
 
-    // ------------- Configuration ------------
-    // detector
-    constexpr int numkps = 1000;
-    constexpr bool multithread = true;
-    // --------------------------------
+
 
     int n = 0;
 
@@ -104,11 +104,11 @@ void index(const char *path) {
     }
 }
 
-void search(std::string search_type) {
+void search(std::string search_type, std::string search_filename) {
     constexpr int warmups = 10;
     constexpr int runs = 25;
-    constexpr int size = 10000;
-    constexpr int threshold = 20;
+    constexpr int size = 704000;
+    constexpr int threshold = 1000;
     constexpr int max_twiddles = 20;
     // --------------------------------
 
@@ -117,31 +117,42 @@ void search(std::string search_type) {
     std::vector<uint8_t> tvecs(64 * size);
 
 
-//        std::ofstream tout("tvecs.dat", std::ios::out | std::ios::binary);
-//        tout.write((char*)&tvecs[0], tvecs.size() * sizeof(uint8_t));
-//        tout.close();
-
-//        std::ofstream qout("qvecs.dat", std::ios::out | std::ios::binary);
-//        qout.write((char*)&qvecs[0], qvecs.size() * sizeof(uint8_t));
-//        qout.close();
-
-
     std::ifstream tin("training.dat", std::ios::in | std::ios::binary);
-    tin.read(reinterpret_cast<char *>(&tvecs[0]), sizeof(uint8_t) * 64 * size);
+    tin.read(reinterpret_cast<char *>(&tvecs[0]), size);
     tin.close();
 
-    std::ifstream qin("query.dat", std::ios::in | std::ios::binary);
-    qin.read(reinterpret_cast<char *>(&qvecs[0]), sizeof(uint8_t) * 64 * size);
-    qin.close();
 
+    cv::Mat image = cv::imread(search_filename, CV_LOAD_IMAGE_GRAYSCALE);
+    if (!image.data) {
+        std::cerr << "ERROR: failed to open image. Aborting." << std::endl;
+        return;
+    }
 
-    printf("%.2X", tvecs[0]);
-    printf("%.2X", qvecs[0]);
+    std::vector<cv::KeyPoint> keypoints;
+    uint64_t *descriptor;
+    std::vector<KeyPoint> kps;
+
+    // ------------- Detection of key points ------------
+    std::cout << std::endl << "Detecting..." << std::endl;
+    cv::Ptr<cv::ORB> orb = cv::ORB::create(numkps, 1.2f, 8, 31, 0, 2, cv::ORB::HARRIS_SCORE, 31, 20);
+    orb->detect(image, keypoints);
+    // ---------------------------------------------------
+
+    // -------------- Building LATCH ---------------------
+    std::cout << std::endl << "LATCHing..." << std::endl;
+
+    descriptor = new uint64_t[8 * keypoints.size()];
+
+    // OpenCV requires radians not degrees
+    for (auto &&kp : keypoints) kps.emplace_back(kp.pt.x, kp.pt.y, kp.size, kp.angle * 3.14159265f / 180.0f);
+    LATCH<multithread>(image.data, image.cols, image.rows, static_cast<int>(image.step), kps, descriptor);
+
+    //unsigned int kps_count = 8 * keypoints.size();
+    //for (unsigned int i = 0; i < kps_count; ++i) std::cout << std::bitset<64>(descriptor[i]) << std::endl;
 
     // --------------------------------
-
     // Initialization of Matcher class
-    Matcher<false> m(tvecs.data(), size, qvecs.data(), size, threshold, max_twiddles);
+    Matcher<false> m(tvecs.data(), tvecs.size(), descriptor, keypoints.size(), threshold, max_twiddles);
 
     // @todo run in different thread so its already 'warmed up'
     std::cout << std::endl << "Warming up..." << std::endl;
@@ -168,10 +179,11 @@ void search(std::string search_type) {
     std::cout << "Throughput: " << static_cast<double>(size) * static_cast<double>(size) / sec * 1e-9
               << " billion comparisons/second." << std::endl << std::endl;
 
+    std::cout << "Descriptors found (match.t lilst)" << std::endl;
     for (auto &&match : m.matches) {
         std::cout << match.t << std::endl;
-
     }
+    std::cout << "End of list of descriptors" << std::endl;
 
 }
 
@@ -187,8 +199,8 @@ int main(int argc, char **argv) {
         po::options_description desc("Options");
         desc.add_options()
                 ("help", "Print help messages")
-                ("index-path",  po::value<std::string>(&index_path), "/path/to; Create an index/training.dat file from images and a simple file with a single image query.dat set")
-                ("search",  po::value<std::string>(&search_type), "fast-approx or brute-force; Search training.dat for what is present in query.dat");
+                ("index-path",  po::value<std::string>(&index_path), "</path/to/images/>; Create an index/training.dat file from images at given directory.")
+                ("search",  po::value<std::string>(&search_type),  "<filename.jpg>; Search training.dat descriptors for similar descriptors from <filename.jpg>");
 
         po::variables_map vm;
         try {
@@ -213,7 +225,7 @@ int main(int argc, char **argv) {
 
 
             if (vm.count("search")) {
-                search(vm["search"].as<std::string>());
+                search("fast-approx", vm["search"].as<std::string>());
                 return 1;
             }
 
