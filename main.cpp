@@ -27,7 +27,7 @@ bool write_file_binary(std::string const &filename, char const *data, size_t con
 }
 
 
-void index(const char *path) {
+void index_from_path(const char *path) {
 
     std::cout << "Scanning...\n";
 
@@ -105,6 +105,11 @@ void index(const char *path) {
 void search() {
     constexpr int threshold = 5;
     constexpr int max_twiddles = 200;
+    constexpr int warmups = 5;
+
+    int start;
+    int i;
+
     // --------------------------------
 //        std::ofstream tout("tvecs.dat", std::ios::out | std::ios::binary);
 //        tout.write((char*)&tvecs[0], tvecs.size() * sizeof(uint8_t));
@@ -119,7 +124,7 @@ void search() {
     std::ifstream tin("training.dat", std::ios::in | std::ios::binary | std::ios::ate);
     int tsize = tin.tellg();
     tin.seekg(0);
-    std::vector <uint8_t> tvecs(tsize);
+    std::vector<uint8_t> tvecs(tsize);
     tin.read(reinterpret_cast<char *>(&tvecs[0]), tsize);
     tin.close();
 
@@ -127,7 +132,7 @@ void search() {
     std::ifstream qin("query.dat", std::ios::in | std::ios::binary | std::ios::ate);
     int qsize = qin.tellg();
     qin.seekg(0);
-    std::vector <uint8_t> qvecs(qsize);
+    std::vector<uint8_t> qvecs(qsize);
     qin.read(reinterpret_cast<char *>(&qvecs[0]), qsize);
     qin.close();
 
@@ -137,57 +142,78 @@ void search() {
 
     // Initialization of Matcher class
     // number for vector size size is /64, this is because it needs to know how many descriptors
-    Matcher<false> m(tvecs.data(), tsize/64, qvecs.data(), qsize/64, threshold, max_twiddles);
+    Matcher<false> m(tvecs.data(), tsize / 64, qvecs.data(), qsize / 64, threshold, max_twiddles);
 
+    // -----------------------------------------------------------------------------------
     std::cout << "---- fastApproxMatch results ----" << std::endl;
+    std::cout << "Warming up..." << std::endl;
+    for (i = 0; i < warmups; ++i) {
+        m.fastApproxMatch();
+        std::cout << ".";
+    }
+    std::cout << std::endl;
     m.fastApproxMatch();
 
-    int start;
-    int i;
-    i=0;
-    start=m.matches[0].t;
+    i = 0;
+    start = m.matches[0].t;
     for (auto &&match : m.matches) {
-        if(start == match.t) {
+        if (start == match.t) {
             i++;
         } else {
             std::cout << "Non consecutive reference found at " << match.t << " -> " << start << std::endl;
         }
         start++;
     }
-    if(i == numkps) {
-        std::cout << i << " consecutive results found"<< std::endl;
+    if ((unsigned) i == m.matches.size()) {
+        std::cout << i << " consecutive results found" << std::endl;
     }
 
+    // -----------------------------------------------------------------------------------
     std::cout << "---- bruteMatch results ----" << std::endl;
+    std::cout << "Warming up..." << std::endl;
+    for (i = 0; i < warmups; ++i) {
+        m.bruteMatch();
+        std::cout << ".";
+    }
+    std::cout << std::endl;
+
     m.bruteMatch();
-    i=0;
-    start=m.matches[0].t;
+
+    i = 0;
+    start = m.matches[0].t;
     for (auto &&match : m.matches) {
-        if(start == match.t) {
+        if (start == match.t) {
             i++;
         } else {
             std::cout << "Non consecutive reference found at " << match.t << " -> " << start << std::endl;
         }
         start++;
     }
-    if(i == numkps) {
-        std::cout << i << " consecutive results found"<< std::endl;
+    if ((unsigned) i == m.matches.size()) {
+        std::cout << i << " consecutive results found" << std::endl;
     }
 
+    // -----------------------------------------------------------------------------------
     std::cout << "---- exactMatch results ----" << std::endl;
+    std::cout << "Warming up..." << std::endl;
+    for (i = 0; i < warmups; ++i) {
+        m.exactMatch();
+        std::cout << ".";
+    }
+    std::cout << std::endl;
     m.exactMatch();
-    i=0;
-    start=m.matches[0].t;
+    i = 0;
+    start = m.matches[0].t;
     for (auto &&match : m.matches) {
-        if(start == match.t) {
+        if (start == match.t) {
             i++;
         } else {
             std::cout << "Non consecutive reference found at " << match.t << " -> " << start << std::endl;
         }
         start++;
     }
-    if(i == numkps) {
-        std::cout << i << " consecutive results found"<< std::endl;
+    if ((unsigned) i == m.matches.size()) {
+        std::cout << i << " consecutive results found" << std::endl;
     }
 
 
@@ -198,6 +224,7 @@ int main(int argc, char **argv) {
 
     std::string index_path;
     std::string search_type;
+    std::cout.setf(std::ios::unitbuf);
 
     try {
         /** Define and parse the program options
@@ -226,7 +253,7 @@ int main(int argc, char **argv) {
             if (vm.count("index-path")) {
                 std::cout << "Indexing images in " << vm["index-path"].as<std::string>()<< std::endl;
                 const char *cstr = vm["index-path"].as<std::string>().c_str();
-                index(cstr);
+                index_from_path(cstr);
                 return 1;
             }
 
