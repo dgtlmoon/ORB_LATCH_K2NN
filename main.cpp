@@ -1,7 +1,6 @@
 #include <iostream>
 #include <fstream>
 #include <opencv2/opencv.hpp>
-#include <chrono>
 #include <bitset>
 #include "LATCH.h"
 #include "K2NN.h"
@@ -10,8 +9,7 @@
 #include <boost/range/iterator_range.hpp>
 #include <boost/program_options.hpp>
 
-
-using namespace std::chrono;
+constexpr int numkps = 1000;
 
 
 using namespace std;
@@ -37,7 +35,7 @@ void index(const char *path) {
 
     // ------------- Configuration ------------
     // detector
-    constexpr int numkps = 1000;
+
     constexpr bool multithread = true;
     // --------------------------------
 
@@ -58,8 +56,8 @@ void index(const char *path) {
             // ------------- Image Read ------------
             cv::Mat image = cv::imread(entry.path().string(), CV_LOAD_IMAGE_GRAYSCALE);
             if (!image.data) {
-                std::cerr << "ERROR: failed to open image. Aborting." << std::endl;
-                return;
+                std::cerr << "ERROR: failed to open image. Skipping." << std::endl;
+                continue;
             }
 
             // ------------- Detection of key points ------------
@@ -104,19 +102,10 @@ void index(const char *path) {
     }
 }
 
-void search(std::string search_type) {
-    constexpr int warmups = 10;
-    constexpr int runs = 25;
-    constexpr int size = 10000;
-    constexpr int threshold = 20;
-    constexpr int max_twiddles = 20;
+void search() {
+    constexpr int threshold = 5;
+    constexpr int max_twiddles = 200;
     // --------------------------------
-
-
-    std::vector<uint8_t> qvecs(64 * size);
-    std::vector<uint8_t> tvecs(64 * size);
-
-
 //        std::ofstream tout("tvecs.dat", std::ios::out | std::ios::binary);
 //        tout.write((char*)&tvecs[0], tvecs.size() * sizeof(uint8_t));
 //        tout.close();
@@ -126,57 +115,87 @@ void search(std::string search_type) {
 //        qout.close();
 
 
-    std::ifstream tin("training.dat", std::ios::in | std::ios::binary);
-    tin.read(reinterpret_cast<char *>(&tvecs[0]), sizeof(uint8_t) * 64 * size);
+    // Loading training data
+    std::ifstream tin("training.dat", std::ios::in | std::ios::binary | std::ios::ate);
+    int tsize = tin.tellg();
+    tin.seekg(0);
+    std::vector <uint8_t> tvecs(tsize);
+    tin.read(reinterpret_cast<char *>(&tvecs[0]), tsize);
     tin.close();
 
-    std::ifstream qin("query.dat", std::ios::in | std::ios::binary);
-    qin.read(reinterpret_cast<char *>(&qvecs[0]), sizeof(uint8_t) * 64 * size);
+    // Load query data
+    std::ifstream qin("query.dat", std::ios::in | std::ios::binary | std::ios::ate);
+    int qsize = qin.tellg();
+    qin.seekg(0);
+    std::vector <uint8_t> qvecs(qsize);
+    qin.read(reinterpret_cast<char *>(&qvecs[0]), qsize);
     qin.close();
 
 
-    printf("%.2X", tvecs[0]);
-    printf("%.2X", qvecs[0]);
-
     // --------------------------------
 
+
     // Initialization of Matcher class
-    Matcher<false> m(tvecs.data(), size, qvecs.data(), size, threshold, max_twiddles);
+    // number for vector size size is /64, this is because it needs to know how many descriptors
+    Matcher<false> m(tvecs.data(), tsize/64, qvecs.data(), qsize/64, threshold, max_twiddles);
 
-    // @todo run in different thread so its already 'warmed up'
-    std::cout << std::endl << "Warming up..." << std::endl;
-    high_resolution_clock::time_point start;
+    std::cout << "---- fastApproxMatch results ----" << std::endl;
+    m.fastApproxMatch();
 
-    if(!search_type.compare("fast-approx")) {
-        for (int i = 0; i < warmups; ++i) m.fastApproxMatch();
-        std::cout << "Testing fast approximate matches..." << std::endl;
-        start = high_resolution_clock::now();
-        m.fastApproxMatch();
-    } else {
-        for (int i = 0; i < warmups; ++i) m.bruteMatch();
-        std::cout << "Testing brute-force..." << std::endl;
-        start = high_resolution_clock::now();
-        m.bruteMatch();
-    }
-
-    high_resolution_clock::time_point end = high_resolution_clock::now();
-
-    const double sec =
-            static_cast<double>(duration_cast<nanoseconds>(end - start).count()) * 1e-9 / static_cast<double>(runs);
-    std::cout << std::endl << search_type << " K2NN found " << m.matches.size() << " matches in " << sec * 1e3 << " ms"
-              << std::endl;
-    std::cout << "Throughput: " << static_cast<double>(size) * static_cast<double>(size) / sec * 1e-9
-              << " billion comparisons/second." << std::endl << std::endl;
-
+    int start;
+    int i;
+    i=0;
+    start=m.matches[0].t;
     for (auto &&match : m.matches) {
-        std::cout << match.t << std::endl;
-
+        if(start == match.t) {
+            i++;
+        } else {
+            std::cout << "Non consecutive reference found at " << match.t << " -> " << start << std::endl;
+        }
+        start++;
     }
+    if(i == numkps) {
+        std::cout << i << " consecutive results found"<< std::endl;
+    }
+
+    std::cout << "---- bruteMatch results ----" << std::endl;
+    m.bruteMatch();
+    i=0;
+    start=m.matches[0].t;
+    for (auto &&match : m.matches) {
+        if(start == match.t) {
+            i++;
+        } else {
+            std::cout << "Non consecutive reference found at " << match.t << " -> " << start << std::endl;
+        }
+        start++;
+    }
+    if(i == numkps) {
+        std::cout << i << " consecutive results found"<< std::endl;
+    }
+
+    std::cout << "---- exactMatch results ----" << std::endl;
+    m.exactMatch();
+    i=0;
+    start=m.matches[0].t;
+    for (auto &&match : m.matches) {
+        if(start == match.t) {
+            i++;
+        } else {
+            std::cout << "Non consecutive reference found at " << match.t << " -> " << start << std::endl;
+        }
+        start++;
+    }
+    if(i == numkps) {
+        std::cout << i << " consecutive results found"<< std::endl;
+    }
+
 
 }
 
 
 int main(int argc, char **argv) {
+
     std::string index_path;
     std::string search_type;
 
@@ -187,8 +206,8 @@ int main(int argc, char **argv) {
         po::options_description desc("Options");
         desc.add_options()
                 ("help", "Print help messages")
-                ("index-path",  po::value<std::string>(&index_path), "/path/to; Create an index/training.dat file from images and a simple file with a single image query.dat set")
-                ("search",  po::value<std::string>(&search_type), "fast-approx or brute-force; Search training.dat for what is present in query.dat");
+                ("index-path",  po::value<std::string>(&index_path), "</path/to>; Create an index/training.dat file from images and a simple file with a single image query.dat set")
+                ("search", "Perform various searches");
 
         po::variables_map vm;
         try {
@@ -213,7 +232,7 @@ int main(int argc, char **argv) {
 
 
             if (vm.count("search")) {
-                search(vm["search"].as<std::string>());
+                search();
                 return 1;
             }
 
