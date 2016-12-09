@@ -9,7 +9,7 @@
 #include <boost/range/iterator_range.hpp>
 #include <boost/program_options.hpp>
 
-constexpr int numkps = 1000;
+unsigned int numkps = 200;
 
 
 using namespace std;
@@ -27,6 +27,67 @@ bool write_file_binary(std::string const &filename, char const *data, size_t con
 }
 
 
+/**
+ * Re-defines numkps as 255, then there are 255 descriptors with 512 bits
+ * we then assign each descriptor as
+ *
+ * [first 7 byte]..[last byte]
+ * 11111111111111..0000001
+ * 11111111111111..0000010
+ * 11111111111111..0000011
+ * ...
+ * 11111111111111..1111101
+ * 11111111111111..1111110
+ * 11111111111111..1111111
+ *
+ *
+ * This allows us to test the nearest neighbour algorithm
+ */
+void index_from_loop() {
+
+    numkps=255;
+    std::vector<uint8_t> tvecs(64 * numkps);
+
+    int offset=0;
+
+    for (unsigned n=0; n< numkps; n++) {
+        // set the first 7 bytes to 255/^11111111
+        for (unsigned b = 0; b < 63; b++) {
+            offset = (n * 64) + b;
+            tvecs[offset] = 255;
+        }
+        offset++;
+        // and the last byte of the 8 bytes to our 0..255 counter
+        tvecs[offset] = n;
+
+    }
+
+
+    std::cout << "Creating set of test training descriptors\n";
+    std::ofstream tout("training.dat", std::ios::out | std::ios::binary);
+    tout.write((char*)&tvecs[0], 64 * numkps);
+    tout.close();
+
+
+    std::cout << "Creating single query descriptor from the first descriptor generated\n";
+
+    std::ofstream qout("query.dat", std::ios::out | std::ios::binary);
+    qout.write((char*)&tvecs[0], 64);
+    qout.close();
+
+
+
+    std::cout << "Done\n";
+}
+
+/**
+ * Scan a path and build the index .dat file of descriptors.
+ *
+ * Also on the 3rd (arbitrary number) save the descriptors as query.dat so we can search those descriptors in the
+ * trained index.
+ *
+ * @param path
+ */
 void index_from_path(const char *path) {
 
     std::cout << "Scanning...\n";
@@ -110,16 +171,6 @@ void search() {
     int start;
     int i;
 
-    // --------------------------------
-//        std::ofstream tout("tvecs.dat", std::ios::out | std::ios::binary);
-//        tout.write((char*)&tvecs[0], tvecs.size() * sizeof(uint8_t));
-//        tout.close();
-
-//        std::ofstream qout("qvecs.dat", std::ios::out | std::ios::binary);
-//        qout.write((char*)&qvecs[0], qvecs.size() * sizeof(uint8_t));
-//        qout.close();
-
-
     // Loading training data
     std::ifstream tin("training.dat", std::ios::in | std::ios::binary | std::ios::ate);
     int tsize = tin.tellg();
@@ -137,6 +188,17 @@ void search() {
     qin.close();
 
 
+    std::cout << "Loaded " << qin.gcount() << " bytes from query.dat" << std::endl;
+    std::cout << "Loaded " << tin.gcount() << " bytes from training.dat" << std::endl;
+
+    std::cout << "First descriptor in query.dat looks like.. " << std::endl;
+    for ( i = 0; i < 64; ++i) std::cout << std::bitset<8>(qvecs[i]);
+    std::cout << std::endl;
+
+    std::cout << "First descriptor in training.dat looks like.. " << std::endl;
+    for ( i = 0; i < 64; ++i) std::cout << std::bitset<8>(tvecs[i]);
+    std::cout << std::endl;
+
     // --------------------------------
 
 
@@ -153,19 +215,22 @@ void search() {
     }
     std::cout << std::endl;
     m.fastApproxMatch();
-
     i = 0;
-    start = m.matches[0].t;
-    for (auto &&match : m.matches) {
-        if (start == match.t) {
-            i++;
-        } else {
-            std::cout << "Non consecutive reference found at " << match.t << " -> " << start << std::endl;
+    if(m.matches.size()) {
+        start = m.matches[0].t;
+        for (auto &&match : m.matches) {
+            if (start == match.t) {
+                i++;
+            } else {
+                std::cout << "Non consecutive reference found at " << match.t << " -> " << start << std::endl;
+            }
+            start++;
         }
-        start++;
-    }
-    if ((unsigned) i == m.matches.size()) {
-        std::cout << i << " consecutive results found" << std::endl;
+        if ((unsigned) i == m.matches.size()) {
+            std::cout << i << " consecutive results found" << std::endl;
+        }
+    } else {
+        std::cout << "No matches found" << std::endl;
     }
 
     // -----------------------------------------------------------------------------------
@@ -180,17 +245,23 @@ void search() {
     m.bruteMatch();
 
     i = 0;
-    start = m.matches[0].t;
-    for (auto &&match : m.matches) {
-        if (start == match.t) {
-            i++;
-        } else {
-            std::cout << "Non consecutive reference found at " << match.t << " -> " << start << std::endl;
+    i = 0;
+    if(m.matches.size()) {
+
+        start = m.matches[0].t;
+        for (auto &&match : m.matches) {
+            if (start == match.t) {
+                i++;
+            } else {
+                std::cout << "Non consecutive reference found at " << match.t << " -> " << start << std::endl;
+            }
+            start++;
         }
-        start++;
-    }
-    if ((unsigned) i == m.matches.size()) {
-        std::cout << i << " consecutive results found" << std::endl;
+        if ((unsigned) i == m.matches.size()) {
+            std::cout << i << " consecutive results found" << std::endl;
+        }
+    } else {
+        std::cout << "No matches found" << std::endl;
     }
 
     // -----------------------------------------------------------------------------------
@@ -203,20 +274,24 @@ void search() {
     std::cout << std::endl;
     m.exactMatch();
     i = 0;
-    start = m.matches[0].t;
-    for (auto &&match : m.matches) {
-        if (start == match.t) {
-            i++;
-        } else {
-            std::cout << "Non consecutive reference found at " << match.t << " -> " << start << std::endl;
+    if(m.matches.size()) {
+
+        start = m.matches[0].t;
+        for (auto &&match : m.matches) {
+            if (start == match.t) {
+                i++;
+            } else {
+                std::cout << "Non consecutive reference found at " << match.t << " -> " << start << std::endl;
+            }
+            start++;
         }
-        start++;
-    }
-    if ((unsigned) i == m.matches.size()) {
-        std::cout << i << " consecutive results found" << std::endl;
-    }
+        if ((unsigned) i == m.matches.size()) {
+            std::cout << i << " consecutive results found" << std::endl;
+        }
 
-
+    } else {
+        std::cout << "No matches found" << std::endl;
+    }
 }
 
 
@@ -233,6 +308,7 @@ int main(int argc, char **argv) {
         po::options_description desc("Options");
         desc.add_options()
                 ("help", "Print help messages")
+                ("test-index",  "Creates a test index of cascading bits set")
                 ("index-path",  po::value<std::string>(&index_path), "</path/to>; Create an index/training.dat file from images and a simple file with a single image query.dat set")
                 ("search", "Perform various searches");
 
@@ -255,10 +331,10 @@ int main(int argc, char **argv) {
                 const char *cstr = vm["index-path"].as<std::string>().c_str();
                 index_from_path(cstr);
                 return 1;
-            }
-
-
-            if (vm.count("search")) {
+            } else if (vm.count("test-index")) {
+                index_from_loop();
+                return 1;
+            } else if (vm.count("search")) {
                 search();
                 return 1;
             }
