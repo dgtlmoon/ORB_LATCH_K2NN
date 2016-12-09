@@ -165,8 +165,8 @@ void index_from_path(const char *path) {
 
 void search() {
     constexpr int threshold = 5;
-    constexpr int max_twiddles = 200;
-    constexpr int warmups = 5;
+    constexpr int max_twiddles = 2;
+    constexpr int warmups = 10;
 
     int start;
     int i;
